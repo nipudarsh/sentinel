@@ -20,8 +20,11 @@ class RegimeConfig:
 def classify_regime(
     atr_pct: float,
     trend_strength: float,
-    cfg: RegimeConfig = RegimeConfig(),
+    cfg: RegimeConfig | None = None,
 ) -> MarketRegime:
+    if cfg is None:
+        cfg = RegimeConfig()
+
     """
     Classify market regime using volatility + trend structure.
     atr_pct: ATR as % of price
