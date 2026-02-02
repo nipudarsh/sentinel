@@ -10,7 +10,6 @@ from sentinel.core.exchange import (
 )
 
 
-
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="SENTINEL: list USDT pairs (read-only).")
     p.add_argument("--exchange", default="binance", help="ccxt exchange id (default: binance)")
