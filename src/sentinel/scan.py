@@ -8,6 +8,7 @@ from sentinel.core.indicators import atr_pct, trend_strength
 from sentinel.core.mathutils import ema
 from sentinel.core.ohlcv import OHLCVConfig, fetch_ohlcv_safe, split_ohlcv
 from sentinel.core.regime import MarketRegime, classify_regime
+from sentinel.core.report import ReportRow, print_briefing
 from sentinel.core.setups import (
     BreakoutRetestConfig,
     PullbackConfig,
@@ -52,6 +53,7 @@ def parse_args() -> argparse.Namespace:
 
     p.add_argument("--setups", action="store_true", help="detect setups (WATCH/READY) for TREND pairs")
     p.add_argument("--exclude-stables", action="store_true", help="exclude stablecoin base pairs (recommended)")
+    p.add_argument("--brief", action="store_true", help="print trader briefing at the end")
 
     return p.parse_args()
 
@@ -108,12 +110,10 @@ def compute_setup_for_symbol(ex, symbol: str, timeframe: str, bars: int) -> Trad
     if not closes:
         return None
 
-    # Setup 1: Pullback continuation
     plan = detect_pullback_long(closes, lows, symbol, PullbackConfig())
     if plan is not None:
         return plan
 
-    # Setup 2: Breakout + retest
     plan = detect_breakout_retest_long(closes, lows, symbol, BreakoutRetestConfig())
     return plan
 
@@ -146,6 +146,8 @@ def main() -> int:
     print("SYMBOL".ljust(16), "REGIME".ljust(8), "ATR%".rjust(7), "TREND".rjust(7), "ACTION")
     print("-" * 70)
 
+    rows: list[ReportRow] = []
+
     shown = 0
     for sym in pairs:
         try:
@@ -172,16 +174,30 @@ def main() -> int:
 
         print(f"{sym.ljust(16)} {r.value.ljust(8)} {a:7.2f} {ts:7.3f}  {action}")
 
+        note = ""
         if plan is not None:
             print(
                 f"  ↳ PLAN: {plan.direction.upper()} {plan.setup} {plan.status} | SL={plan.stop:.6f} | TP1={plan.tp1:.6f} | TP2={plan.tp2:.6f}"
             )
             print(f"     TRIGGER: {plan.entry_trigger}")
             print(f"     NOTES: {plan.notes}")
+            note = plan.entry_trigger
+        else:
+            if r == MarketRegime.TREND:
+                note = "Trend only. Wait for A+ setup (do not force entry)."
+            elif r == MarketRegime.RANGE:
+                note = "Range. Prefer patience; avoid chop."
+            else:
+                note = "Chaos. Protect capital."
+
+        rows.append(ReportRow(symbol=sym, regime=r.value, action=action, note=note))
 
         shown += 1
         if shown >= max(args.limit, 0):
             break
+
+    if args.brief:
+        print_briefing(rows)
 
     return 0
 

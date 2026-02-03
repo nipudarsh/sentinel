@@ -11,26 +11,47 @@ class ReportRow:
     note: str = ""
 
 
-def print_report(rows: list[ReportRow]) -> None:
+def print_briefing(rows: list[ReportRow]) -> None:
     if not rows:
-        print("No rows.")
+        print("\nNo briefing rows.")
         return
 
-    print("-" * 78)
-    print("SENTINEL BRIEFING")
-    print("-" * 78)
+    trend = [r for r in rows if r.regime == "trend" and not r.action.startswith("A+")]
+    setups = [r for r in rows if r.action.startswith("A+")]
+    chaos = [r for r in rows if r.regime == "chaos"]
+    range_rows = [r for r in rows if r.regime == "range"]
 
-    for r in rows:
-        line = f"{r.symbol.ljust(16)} {r.regime.ljust(7)} {r.action.ljust(18)} {r.note}"
-        print(line)
+    print("\n" + "=" * 78)
+    print("SENTINEL — TRADER BRIEFING (manual execution only)")
+    print("=" * 78)
 
+    if setups:
+        print("\nA+ SETUPS (prioritize)")
+        print("-" * 78)
+        for r in setups:
+            print(f"- {r.symbol}: {r.action}  {r.note}".rstrip())
+
+    if trend:
+        print("\nTREND WATCHLIST (wait for A+ confirmation)")
+        print("-" * 78)
+        for r in trend[:20]:
+            print(f"- {r.symbol}: {r.note}".rstrip())
+
+    if range_rows:
+        print("\nRANGE / LIMITED (avoid forcing)")
+        print("-" * 78)
+        for r in range_rows[:15]:
+            print(f"- {r.symbol}: {r.note}".rstrip())
+
+    if chaos:
+        print("\nCHAOS (NO TRADE)")
+        print("-" * 78)
+        for r in chaos[:15]:
+            print(f"- {r.symbol}: protect capital".rstrip())
+
+    print("\nRISK RULES (simple + strict)")
     print("-" * 78)
-    print("TASKS (manual execution only)")
-    print("-" * 78)
-    for r in rows:
-        if r.action.startswith("A+"):
-            print(f"- {r.symbol}: follow the plan; risk small; wait confirmation; journal result")
-        elif r.regime == "trend":
-            print(f"- {r.symbol}: set alerts; wait for an A+ setup (no forcing)")
-        elif r.regime == "chaos":
-            print(f"- {r.symbol}: NO TRADE (protect capital)")
+    print("- Risk per trade: 1 USDT (or less) until consistency is proven.")
+    print("- Only trade A+ setups. TREND alone is not an entry signal.")
+    print("- After +1R: reduce risk (partial) and protect position (trail/BE).")
+    print("=" * 78)
