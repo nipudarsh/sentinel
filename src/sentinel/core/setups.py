@@ -10,24 +10,15 @@ from sentinel.core.structure import near_level, recent_swing_low
 class PullbackConfig:
     ema_fast: int = 20
     ema_slow: int = 50
-    pullback_tolerance_pct: float = 1.2  # relaxed, realistic
+    pullback_tolerance_pct: float = 1.2
     swing_lookback: int = 20
 
-@dataclass(frozen=True)
-class TradePlan:
-    symbol: str
-    direction: str  # "long"
-    status: str     # "WATCH" or "READY"
-    entry_trigger: str
-    stop: float
-    tp1: float
-    tp2: float
-    notes: str
 
 @dataclass(frozen=True)
 class TradePlan:
     symbol: str
     direction: str  # "long"
+    status: str  # "WATCH" or "READY"
     entry_trigger: str
     stop: float
     tp1: float
@@ -41,7 +32,6 @@ def detect_pullback_long(
     symbol: str,
     cfg: PullbackConfig,
 ) -> TradePlan | None:
-    # Need enough candles
     if len(closes) < max(cfg.ema_fast, cfg.ema_slow) + 10:
         return None
 
@@ -63,8 +53,7 @@ def detect_pullback_long(
         or near_level(prev_low, e20, cfg.pullback_tolerance_pct)
         or near_level(prev_low, e50, cfg.pullback_tolerance_pct)
     )
-
-        if not pulled_back:
+    if not pulled_back:
         return None
 
     status = "READY" if price > e20 else "WATCH"
@@ -104,6 +93,3 @@ def detect_pullback_long(
             "Pullback via wick/close near EMA. Manage at +1R / +2R."
         ),
     )
-
-        
-    

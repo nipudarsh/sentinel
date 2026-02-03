@@ -27,23 +27,14 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--limit", type=int, default=30, help="how many pairs to print (default: 30)")
 
     p.add_argument("--quality", action="store_true", help="apply quality filters + volume ranking")
-    p.add_argument(
-        "--min-qv",
-        type=float,
-        default=5_000_000.0,
-        help="min 24h quote volume in USDT for --quality (default: 5,000,000)",
-    )
+    p.add_argument("--min-qv", type=float, default=5_000_000.0, help="min 24h quote volume for quality mode")
 
     p.add_argument("--regime", action="store_true", help="compute TREND/RANGE/CHAOS for each pair (slower)")
     p.add_argument("--timeframe", default="1h", help="ohlcv timeframe for regime/setups (default: 1h)")
     p.add_argument("--bars", type=int, default=120, help="ohlcv bars to fetch (default: 120)")
     p.add_argument("--max-pairs", type=int, default=60, help="max pairs to analyze in regime mode (default: 60)")
 
-    p.add_argument(
-        "--setups",
-        action="store_true",
-        help="detect A+ setups (currently: trend pullback continuation longs) for TREND pairs",
-    )
+    p.add_argument("--setups", action="store_true", help="detect setups (WATCH/READY) for TREND pairs")
 
     return p.parse_args()
 
@@ -73,12 +64,7 @@ def rank_quality_pairs(ex, markets: dict, pairs: list[str], min_qv: float) -> li
     return [s for (s, _qv) in scored]
 
 
-def compute_regime_for_symbol(
-    ex,
-    symbol: str,
-    timeframe: str,
-    bars: int,
-) -> tuple[MarketRegime, float, float]:
+def compute_regime_for_symbol(ex, symbol: str, timeframe: str, bars: int) -> tuple[MarketRegime, float, float]:
     ohlcv = fetch_ohlcv_safe(ex, symbol, OHLCVConfig(timeframe=timeframe, limit=bars))
     highs, lows, closes = split_ohlcv(ohlcv)
 
@@ -93,7 +79,7 @@ def compute_regime_for_symbol(
 
     ts = trend_strength(ema_fast, ema_slow, price)
 
-    # flat / no-direction guard (reduces false TREND in chop)
+    # Flat-guard: reduce false TREND in chop
     if ts < 0.0005:
         ts = 0.0
 
@@ -101,17 +87,7 @@ def compute_regime_for_symbol(
     return r, a, ts
 
 
-def compute_setup_for_symbol(
-    ex,
-    symbol: str,
-    timeframe: str,
-    bars: int,
-) -> TradePlan | None:
-    """
-    Setup detection is read-only. It returns a TradePlan if conditions match.
-    Currently implemented:
-      - Trend pullback continuation LONG
-    """
+def compute_setup_for_symbol(ex, symbol: str, timeframe: str, bars: int) -> TradePlan | None:
     ohlcv = fetch_ohlcv_safe(ex, symbol, OHLCVConfig(timeframe=timeframe, limit=bars))
     highs, lows, closes = split_ohlcv(ohlcv)
     if not closes:
@@ -129,18 +105,15 @@ def main() -> int:
     print(f"Exchange: {ex.id}")
     print(f"USDT pairs found: {len(pairs)}")
 
-    # Choose pair list
     if args.quality:
         pairs = rank_quality_pairs(ex, markets, pairs, args.min_qv)
 
-    # If not regime mode, just print list
     if not args.regime:
         print("-" * 40)
         for sym in sorted(pairs)[: max(args.limit, 0)]:
             print(sym)
         return 0
 
-    # Regime mode (slower): analyze top N pairs only
     pairs = pairs[: max(args.max_pairs, 0)]
     print(f"Regime analysis on: {len(pairs)} pairs | tf={args.timeframe} bars={args.bars}")
     print("-" * 70)
@@ -163,7 +136,7 @@ def main() -> int:
                 plan = None
 
         if plan is not None:
-    action = f"A+ {plan.status}"
+            action = f"A+ {plan.status}"
         else:
             action = (
                 "trade-allowed"
@@ -171,14 +144,11 @@ def main() -> int:
                 else ("limited" if r == MarketRegime.RANGE else "NO TRADE")
             )
 
-        pprint(
-    f"  ↳ PLAN: {plan.direction.upper()} {plan.status} | SL={plan.stop:.6f} | TP1={plan.tp1:.6f} | TP2={plan.tp2:.6f}"
-)
+        print(f"{sym.ljust(16)} {r.value.ljust(8)} {a:7.2f} {ts:7.3f}  {action}")
 
         if plan is not None:
-            # Show plan details (mentor-style, but still concise)
             print(
-                f"  ↳ PLAN: {plan.direction.upper()} | SL={plan.stop:.6f} | TP1={plan.tp1:.6f} | TP2={plan.tp2:.6f}"
+                f"  ↳ PLAN: {plan.direction.upper()} {plan.status} | SL={plan.stop:.6f} | TP1={plan.tp1:.6f} | TP2={plan.tp2:.6f}"
             )
             print(f"     TRIGGER: {plan.entry_trigger}")
             print(f"     NOTES: {plan.notes}")
