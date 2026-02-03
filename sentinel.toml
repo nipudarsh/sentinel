@@ -1,0 +1,13 @@
+[risk]
+risk_usdt = 1.0
+fee_buffer_pct = 0.10
+
+[quality]
+min_quote_volume_usdt = 5000000
+
+[setups]
+pullback_lookback = 14
+pullback_tolerance_pct = 2.2
+breakout_lookback = 40
+retest_lookback = 10
+retest_tolerance_pct = 1.0

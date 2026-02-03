@@ -17,9 +17,9 @@ class PullbackConfig:
 
 @dataclass(frozen=True)
 class BreakoutRetestConfig:
-    breakout_lookback: int = 40          # swing-high window
-    retest_lookback: int = 10            # check for retest in last N candles
-    retest_tolerance_pct: float = 1.0    # how close low must come to breakout level
+    breakout_lookback: int = 40
+    retest_lookback: int = 10
+    retest_tolerance_pct: float = 1.0
     swing_lookback: int = 30
 
 
@@ -27,8 +27,9 @@ class BreakoutRetestConfig:
 class TradePlan:
     symbol: str
     direction: str  # "long"
-    setup: str      # "PULLBACK" or "BREAKOUT_RETEST"
-    status: str     # "WATCH" or "READY"
+    setup: str  # "PULLBACK" or "BREAKOUT_RETEST"
+    status: str  # "WATCH" or "READY"
+    entry_ref: float
     entry_trigger: str
     stop: float
     tp1: float
@@ -73,35 +74,19 @@ def detect_pullback_long(closes: list[float], lows: list[float], symbol: str, cf
     e20 = ema(closes, cfg.ema_fast)
     e50 = ema(closes, cfg.ema_slow)
 
-    # Trend bias (LONG)
     if not (price > e50 and e20 > e50):
         return None
 
-    pulled_back = _had_pullback_touch(
-        closes=closes,
-        lows=lows,
-        e20=e20,
-        e50=e50,
-        tol_pct=cfg.pullback_tolerance_pct,
-        lookback=cfg.pullback_lookback,
-    )
-    if not pulled_back:
+    if not _had_pullback_touch(closes, lows, e20, e50, cfg.pullback_tolerance_pct, cfg.pullback_lookback):
         return None
 
     status = "READY" if price > e20 else "WATCH"
-
-    recent = closes[-16:]
-    if sum(1 for c in recent if c > e20) < 7:
-        return None
 
     sl = recent_swing_low(lows, lookback=cfg.swing_lookback)
     if sl <= 0 or sl >= price:
         return None
 
     risk = price - sl
-    if risk <= 0:
-        return None
-
     tp1 = price + risk * 1.0
     tp2 = price + risk * 2.0
 
@@ -116,14 +101,12 @@ def detect_pullback_long(closes: list[float], lows: list[float], symbol: str, cf
         direction="long",
         setup="PULLBACK",
         status=status,
+        entry_ref=price,
         entry_trigger=trigger,
         stop=sl,
         tp1=tp1,
         tp2=tp2,
-        notes=(
-            f"Trend continuation: EMA{cfg.ema_fast} > EMA{cfg.ema_slow}. "
-            f"Pullback touched EMA band within last {cfg.pullback_lookback} candles."
-        ),
+        notes=f"Pullback touched EMA band within last {cfg.pullback_lookback} candles.",
     )
 
 
@@ -134,58 +117,38 @@ def _recent_swing_high(closes: list[float], lookback: int) -> float:
     return max(window)
 
 
-def detect_breakout_retest_long(
-    closes: list[float],
-    lows: list[float],
-    symbol: str,
-    cfg: BreakoutRetestConfig,
-) -> TradePlan | None:
+def detect_breakout_retest_long(closes: list[float], lows: list[float], symbol: str, cfg: BreakoutRetestConfig) -> TradePlan | None:
     if len(closes) < cfg.breakout_lookback + 10:
         return None
 
     price = closes[-1]
-
-    # Breakout level = previous swing high (exclude last candle)
-    prior = closes[:-1]
-    level = _recent_swing_high(prior, cfg.breakout_lookback)
+    level = _recent_swing_high(closes[:-1], cfg.breakout_lookback)
     if level <= 0:
         return None
 
-    # Must have broken above level at least once recently
     broke = any(c > level for c in closes[-(cfg.retest_lookback + 5) :])
     if not broke:
         return None
 
-    # Retest: within last N candles, low came near breakout level
     lb = min(cfg.retest_lookback, len(lows) - 1)
-    retested = False
-    for i in range(2, lb + 2):
-        lo = lows[-i]
-        if near_level(lo, level, cfg.retest_tolerance_pct):
-            retested = True
-            break
-
+    retested = any(near_level(lows[-i], level, cfg.retest_tolerance_pct) for i in range(2, lb + 2))
     if not retested:
         return None
 
     status = "READY" if price > level else "WATCH"
 
-    # Stop = swing low
     sl = recent_swing_low(lows, lookback=cfg.swing_lookback)
     if sl <= 0 or sl >= price:
         return None
 
     risk = price - sl
-    if risk <= 0:
-        return None
-
     tp1 = price + risk * 1.0
     tp2 = price + risk * 2.0
 
     trigger = (
         f"Enter on confirmation: close back above breakout level ({level:.6f})."
         if status == "WATCH"
-        else f"Reclaim confirmed (close > breakout level {level:.6f}). Enter only if next candle holds above it."
+        else f"Reclaim confirmed (close > {level:.6f}). Enter only if next candle holds above it."
     )
 
     return TradePlan(
@@ -193,11 +156,10 @@ def detect_breakout_retest_long(
         direction="long",
         setup="BREAKOUT_RETEST",
         status=status,
+        entry_ref=price,
         entry_trigger=trigger,
         stop=sl,
         tp1=tp1,
         tp2=tp2,
-        notes=(
-            f"Breakout + retest: level≈{level:.6f}, retest detected within last {cfg.retest_lookback} candles."
-        ),
+        notes=f"Breakout+retest: level≈{level:.6f}, retest in last {cfg.retest_lookback} candles.",
     )
