@@ -163,7 +163,7 @@ def main() -> int:
                 plan = None
 
         if plan is not None:
-            action = "A+ setup"
+    action = f"A+ {plan.status}"
         else:
             action = (
                 "trade-allowed"
@@ -171,7 +171,9 @@ def main() -> int:
                 else ("limited" if r == MarketRegime.RANGE else "NO TRADE")
             )
 
-        print(f"{sym.ljust(16)} {r.value.ljust(8)} {a:7.2f} {ts:7.3f}  {action}")
+        pprint(
+    f"  ↳ PLAN: {plan.direction.upper()} {plan.status} | SL={plan.stop:.6f} | TP1={plan.tp1:.6f} | TP2={plan.tp2:.6f}"
+)
 
         if plan is not None:
             # Show plan details (mentor-style, but still concise)
