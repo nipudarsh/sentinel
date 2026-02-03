@@ -72,8 +72,12 @@ def compute_regime_for_symbol(ex, symbol: str, timeframe: str, bars: int) -> tup
     price = closes[-1]
     ema_fast = ema(closes, 20)
     ema_slow = ema(closes, 50)
-    ts = trend_strength(ema_fast, ema_slow, price)
-    r = classify_regime(a, ts)
+   ts = trend_strength(ema_fast, ema_slow, price)
+# direction bonus: treat trend_strength as 0 if EMAs are basically flat-crossing
+# (simple: if they are within 0.05% treat as not trending)
+if ts < 0.0005:
+    ts = 0.0
+r = classify_regime(a, ts)
     return r, a, ts
 
 

@@ -12,9 +12,10 @@ class MarketRegime(str, Enum):
 
 @dataclass(frozen=True)
 class RegimeConfig:
-    min_atr_pct: float = 0.3   # too low = dead market
-    max_atr_pct: float = 8.0   # too high = chaos
-    min_trend_strength: float = 0.15  # EMA separation proxy
+    min_atr_pct: float = 0.2   # below this = low vol / likely range
+    max_atr_pct: float = 6.0   # above this = chaos
+    min_trend_strength: float = 0.004  # 0.4% EMA separation
+
 
 
 def classify_regime(
