@@ -10,7 +10,7 @@ from sentinel.core.structure import near_level, recent_swing_low
 class PullbackConfig:
     ema_fast: int = 20
     ema_slow: int = 50
-    pullback_tolerance_pct: float = 0.6  # “near EMA” threshold
+    pullback_tolerance_pct: float = 1.2  # “near EMA” threshold
     swing_lookback: int = 20
 
 
@@ -39,15 +39,27 @@ def detect_pullback_long(closes: list[float], lows: list[float], symbol: str, cf
 
     # Pullback condition: recent close was near EMA20 or EMA50
     prev_close = closes[-2]
-    pulled_back = near_level(prev_close, e20, cfg.pullback_tolerance_pct) or near_level(
-        prev_close, e50, cfg.pullback_tolerance_pct
-    )
+prev_low = lows[-2]
+
+# Pullback if either the previous close OR wick (low) came near EMA20/EMA50
+pulled_back = (
+    near_level(prev_close, e20, cfg.pullback_tolerance_pct)
+    or near_level(prev_close, e50, cfg.pullback_tolerance_pct)
+    or near_level(prev_low, e20, cfg.pullback_tolerance_pct)
+    or near_level(prev_low, e50, cfg.pullback_tolerance_pct)
+)
+
     if not pulled_back:
         return None
 
     # Confirmation trigger: close back above EMA20
     if not (price > e20):
         return None
+    # Sanity: ensure we were above EMA20 during the recent trend (avoid chop)
+recent = closes[-10:]
+if not any(c > e20 for c in recent):
+    return None
+
 
     sl = recent_swing_low(lows, lookback=cfg.swing_lookback)
     if sl <= 0 or sl >= price:

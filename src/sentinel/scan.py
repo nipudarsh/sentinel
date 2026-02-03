@@ -2,8 +2,18 @@ from __future__ import annotations
 
 import argparse
 
-from sentinel.core.exchange import ExchangeConfig, ExchangeError, create_exchange, iter_usdt_symbols, load_markets_safe
-from sentinel.core.filters import PairFilterConfig, passes_market_filters, quote_volume_usdt_from_ticker
+from sentinel.core.exchange import (
+    ExchangeConfig,
+    ExchangeError,
+    create_exchange,
+    iter_usdt_symbols,
+    load_markets_safe,
+)
+from sentinel.core.filters import (
+    PairFilterConfig,
+    passes_market_filters,
+    quote_volume_usdt_from_ticker,
+)
 from sentinel.core.indicators import atr_pct, trend_strength
 from sentinel.core.mathutils import ema
 from sentinel.core.ohlcv import OHLCVConfig, fetch_ohlcv_safe, split_ohlcv
