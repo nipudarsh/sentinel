@@ -10,14 +10,16 @@ from sentinel.core.structure import near_level, recent_swing_low
 class PullbackConfig:
     ema_fast: int = 20
     ema_slow: int = 50
-
-    # More realistic on 4h: pullbacks often drift for days
     pullback_lookback: int = 14
-
-    # Wider tolerance to catch wick/close touches on liquid majors
     pullback_tolerance_pct: float = 2.2
+    swing_lookback: int = 30
 
-    # Stop-loss uses recent structure
+
+@dataclass(frozen=True)
+class BreakoutRetestConfig:
+    breakout_lookback: int = 40          # swing-high window
+    retest_lookback: int = 10            # check for retest in last N candles
+    retest_tolerance_pct: float = 1.0    # how close low must come to breakout level
     swing_lookback: int = 30
 
 
@@ -25,7 +27,8 @@ class PullbackConfig:
 class TradePlan:
     symbol: str
     direction: str  # "long"
-    status: str  # "WATCH" or "READY"
+    setup: str      # "PULLBACK" or "BREAKOUT_RETEST"
+    status: str     # "WATCH" or "READY"
     entry_trigger: str
     stop: float
     tp1: float
@@ -34,57 +37,35 @@ class TradePlan:
 
 
 def _ema_zone_touch(c: float, lo: float, e20: float, e50: float, tol_pct: float) -> bool:
-    """
-    Counts as a pullback if candle close OR wick is:
-      - near EMA20, or near EMA50, OR
-      - inside the EMA band (between EMA20 and EMA50) within tolerance.
-    """
-    # direct touches
-    if near_level(c, e20, tol_pct) or near_level(c, e50, tol_pct) or near_level(lo, e20, tol_pct) or near_level(lo, e50, tol_pct):
+    if (
+        near_level(c, e20, tol_pct)
+        or near_level(c, e50, tol_pct)
+        or near_level(lo, e20, tol_pct)
+        or near_level(lo, e50, tol_pct)
+    ):
         return True
 
-    # band touch: wick enters the EMA20-EMA50 region
     top = max(e20, e50)
     bot = min(e20, e50)
-
-    # expand band slightly by tolerance
     expand = top * (tol_pct / 100.0)
     top2 = top + expand
     bot2 = bot - expand
-
     return bot2 <= lo <= top2 or bot2 <= c <= top2
 
 
-def _had_pullback_touch(
-    closes: list[float],
-    lows: list[float],
-    e20: float,
-    e50: float,
-    tol_pct: float,
-    lookback: int,
-) -> bool:
+def _had_pullback_touch(closes: list[float], lows: list[float], e20: float, e50: float, tol_pct: float, lookback: int) -> bool:
     if len(closes) < 3:
         return False
-
     lb = min(lookback, len(closes) - 1)
-
-    # Examine last lb candles excluding current candle
     for i in range(2, lb + 2):
         c = closes[-i]
         lo = lows[-i]
         if _ema_zone_touch(c, lo, e20, e50, tol_pct):
             return True
-
     return False
 
 
-def detect_pullback_long(
-    closes: list[float],
-    lows: list[float],
-    symbol: str,
-    cfg: PullbackConfig,
-) -> TradePlan | None:
-    # Need enough candles for EMAs + structure
+def detect_pullback_long(closes: list[float], lows: list[float], symbol: str, cfg: PullbackConfig) -> TradePlan | None:
     if len(closes) < max(cfg.ema_fast, cfg.ema_slow) + 30:
         return None
 
@@ -96,7 +77,6 @@ def detect_pullback_long(
     if not (price > e50 and e20 > e50):
         return None
 
-    # Pullback must touch EMA zone recently (multi-candle realistic)
     pulled_back = _had_pullback_touch(
         closes=closes,
         lows=lows,
@@ -108,15 +88,12 @@ def detect_pullback_long(
     if not pulled_back:
         return None
 
-    # READY if currently above EMA20, else WATCH
     status = "READY" if price > e20 else "WATCH"
 
-    # Trend sanity: require meaningful time above EMA20 recently
     recent = closes[-16:]
     if sum(1 for c in recent if c > e20) < 7:
         return None
 
-    # Stop-loss: recent swing low
     sl = recent_swing_low(lows, lookback=cfg.swing_lookback)
     if sl <= 0 or sl >= price:
         return None
@@ -137,6 +114,7 @@ def detect_pullback_long(
     return TradePlan(
         symbol=symbol,
         direction="long",
+        setup="PULLBACK",
         status=status,
         entry_trigger=trigger,
         stop=sl,
@@ -144,7 +122,82 @@ def detect_pullback_long(
         tp2=tp2,
         notes=(
             f"Trend continuation: EMA{cfg.ema_fast} > EMA{cfg.ema_slow}. "
-            f"Pullback touched EMA band within last {cfg.pullback_lookback} candles. "
-            "Manage at +1R / +2R; trail after +1R."
+            f"Pullback touched EMA band within last {cfg.pullback_lookback} candles."
+        ),
+    )
+
+
+def _recent_swing_high(closes: list[float], lookback: int) -> float:
+    if not closes:
+        return 0.0
+    window = closes[-lookback:] if len(closes) >= lookback else closes
+    return max(window)
+
+
+def detect_breakout_retest_long(
+    closes: list[float],
+    lows: list[float],
+    symbol: str,
+    cfg: BreakoutRetestConfig,
+) -> TradePlan | None:
+    if len(closes) < cfg.breakout_lookback + 10:
+        return None
+
+    price = closes[-1]
+
+    # Breakout level = previous swing high (exclude last candle)
+    prior = closes[:-1]
+    level = _recent_swing_high(prior, cfg.breakout_lookback)
+    if level <= 0:
+        return None
+
+    # Must have broken above level at least once recently
+    broke = any(c > level for c in closes[-(cfg.retest_lookback + 5) :])
+    if not broke:
+        return None
+
+    # Retest: within last N candles, low came near breakout level
+    lb = min(cfg.retest_lookback, len(lows) - 1)
+    retested = False
+    for i in range(2, lb + 2):
+        lo = lows[-i]
+        if near_level(lo, level, cfg.retest_tolerance_pct):
+            retested = True
+            break
+
+    if not retested:
+        return None
+
+    status = "READY" if price > level else "WATCH"
+
+    # Stop = swing low
+    sl = recent_swing_low(lows, lookback=cfg.swing_lookback)
+    if sl <= 0 or sl >= price:
+        return None
+
+    risk = price - sl
+    if risk <= 0:
+        return None
+
+    tp1 = price + risk * 1.0
+    tp2 = price + risk * 2.0
+
+    trigger = (
+        f"Enter on confirmation: close back above breakout level ({level:.6f})."
+        if status == "WATCH"
+        else f"Reclaim confirmed (close > breakout level {level:.6f}). Enter only if next candle holds above it."
+    )
+
+    return TradePlan(
+        symbol=symbol,
+        direction="long",
+        setup="BREAKOUT_RETEST",
+        status=status,
+        entry_trigger=trigger,
+        stop=sl,
+        tp1=tp1,
+        tp2=tp2,
+        notes=(
+            f"Breakout + retest: level≈{level:.6f}, retest detected within last {cfg.retest_lookback} candles."
         ),
     )

@@ -2,23 +2,20 @@ from __future__ import annotations
 
 import argparse
 
-from sentinel.core.exchange import (
-    ExchangeConfig,
-    ExchangeError,
-    create_exchange,
-    iter_usdt_symbols,
-    load_markets_safe,
-)
-from sentinel.core.filters import (
-    PairFilterConfig,
-    passes_market_filters,
-    quote_volume_usdt_from_ticker,
-)
+from sentinel.core.exchange import ExchangeConfig, ExchangeError, create_exchange, iter_usdt_symbols, load_markets_safe
+from sentinel.core.filters import PairFilterConfig, passes_market_filters, quote_volume_usdt_from_ticker
 from sentinel.core.indicators import atr_pct, trend_strength
 from sentinel.core.mathutils import ema
 from sentinel.core.ohlcv import OHLCVConfig, fetch_ohlcv_safe, split_ohlcv
 from sentinel.core.regime import MarketRegime, classify_regime
-from sentinel.core.setups import PullbackConfig, TradePlan, detect_pullback_long
+from sentinel.core.setups import (
+    BreakoutRetestConfig,
+    PullbackConfig,
+    TradePlan,
+    detect_breakout_retest_long,
+    detect_pullback_long,
+)
+
 
 _STABLE_BASES = {
     "USDT",
@@ -36,7 +33,6 @@ _STABLE_BASES = {
 
 
 def is_stablecoin_pair(symbol: str) -> bool:
-    # symbol like "USDC/USDT"
     base = symbol.split("/", 1)[0].upper().strip()
     return base in _STABLE_BASES
 
@@ -111,7 +107,15 @@ def compute_setup_for_symbol(ex, symbol: str, timeframe: str, bars: int) -> Trad
     highs, lows, closes = split_ohlcv(ohlcv)
     if not closes:
         return None
-    return detect_pullback_long(closes, lows, symbol, PullbackConfig())
+
+    # Setup 1: Pullback continuation
+    plan = detect_pullback_long(closes, lows, symbol, PullbackConfig())
+    if plan is not None:
+        return plan
+
+    # Setup 2: Breakout + retest
+    plan = detect_breakout_retest_long(closes, lows, symbol, BreakoutRetestConfig())
+    return plan
 
 
 def main() -> int:
@@ -158,7 +162,7 @@ def main() -> int:
                 plan = None
 
         if plan is not None:
-            action = f"A+ {plan.status}"
+            action = f"A+ {plan.setup} {plan.status}"
         else:
             action = (
                 "trade-allowed"
@@ -170,7 +174,7 @@ def main() -> int:
 
         if plan is not None:
             print(
-                f"  ↳ PLAN: {plan.direction.upper()} {plan.status} | SL={plan.stop:.6f} | TP1={plan.tp1:.6f} | TP2={plan.tp2:.6f}"
+                f"  ↳ PLAN: {plan.direction.upper()} {plan.setup} {plan.status} | SL={plan.stop:.6f} | TP1={plan.tp1:.6f} | TP2={plan.tp2:.6f}"
             )
             print(f"     TRIGGER: {plan.entry_trigger}")
             print(f"     NOTES: {plan.notes}")
