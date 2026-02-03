@@ -30,7 +30,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--min-qv", type=float, default=5_000_000.0, help="min 24h quote volume for quality mode")
 
     p.add_argument("--regime", action="store_true", help="compute TREND/RANGE/CHAOS for each pair (slower)")
-    p.add_argument("--timeframe", default="1h", help="ohlcv timeframe for regime/setups (default: 1h)")
+    p.add_argument("--timeframe", default="4h", help="ohlcv timeframe for regime/setups (default: 4h)")
     p.add_argument("--bars", type=int, default=120, help="ohlcv bars to fetch (default: 120)")
     p.add_argument("--max-pairs", type=int, default=60, help="max pairs to analyze in regime mode (default: 60)")
 
