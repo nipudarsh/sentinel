@@ -20,6 +20,26 @@ from sentinel.core.ohlcv import OHLCVConfig, fetch_ohlcv_safe, split_ohlcv
 from sentinel.core.regime import MarketRegime, classify_regime
 from sentinel.core.setups import PullbackConfig, TradePlan, detect_pullback_long
 
+_STABLE_BASES = {
+    "USDT",
+    "USDC",
+    "FDUSD",
+    "TUSD",
+    "USDP",
+    "BUSD",
+    "DAI",
+    "USD1",
+    "USDE",
+    "EUR",
+    "EURC",
+}
+
+
+def is_stablecoin_pair(symbol: str) -> bool:
+    # symbol like "USDC/USDT"
+    base = symbol.split("/", 1)[0].upper().strip()
+    return base in _STABLE_BASES
+
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="SENTINEL: scan USDT pairs (read-only).")
@@ -35,6 +55,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--max-pairs", type=int, default=60, help="max pairs to analyze in regime mode (default: 60)")
 
     p.add_argument("--setups", action="store_true", help="detect setups (WATCH/READY) for TREND pairs")
+    p.add_argument("--exclude-stables", action="store_true", help="exclude stablecoin base pairs (recommended)")
 
     return p.parse_args()
 
@@ -78,8 +99,6 @@ def compute_regime_for_symbol(ex, symbol: str, timeframe: str, bars: int) -> tup
     ema_slow = ema(closes, 50)
 
     ts = trend_strength(ema_fast, ema_slow, price)
-
-    # Flat-guard: reduce false TREND in chop
     if ts < 0.0005:
         ts = 0.0
 
@@ -101,6 +120,9 @@ def main() -> int:
     ex = create_exchange(ExchangeConfig(exchange_id=args.exchange))
     markets = load_markets_safe(ex)
     pairs = list(iter_usdt_symbols(markets))
+
+    if args.exclude_stables:
+        pairs = [p for p in pairs if not is_stablecoin_pair(p)]
 
     print(f"Exchange: {ex.id}")
     print(f"USDT pairs found: {len(pairs)}")
