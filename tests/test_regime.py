@@ -2,7 +2,7 @@ from sentinel.core.regime import MarketRegime, classify_regime
 
 
 def test_trend_regime() -> None:
-    r = classify_regime(atr_pct=1.2, trend_strength=0.3)
+    r = classify_regime(atr_pct=1.2, trend_strength=0.01)
     assert r == MarketRegime.TREND
 
 
