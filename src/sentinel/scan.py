@@ -2,22 +2,13 @@ from __future__ import annotations
 
 import argparse
 
-from sentinel.core.exchange import (
-    ExchangeConfig,
-    ExchangeError,
-    create_exchange,
-    iter_usdt_symbols,
-    load_markets_safe,
-)
-from sentinel.core.filters import (
-    PairFilterConfig,
-    passes_market_filters,
-    quote_volume_usdt_from_ticker,
-)
+from sentinel.core.exchange import ExchangeConfig, ExchangeError, create_exchange, iter_usdt_symbols, load_markets_safe
+from sentinel.core.filters import PairFilterConfig, passes_market_filters, quote_volume_usdt_from_ticker
 from sentinel.core.indicators import atr_pct, trend_strength
 from sentinel.core.mathutils import ema
 from sentinel.core.ohlcv import OHLCVConfig, fetch_ohlcv_safe, split_ohlcv
 from sentinel.core.regime import MarketRegime, classify_regime
+from sentinel.core.setups import PullbackConfig, TradePlan, detect_pullback_long
 
 
 def parse_args() -> argparse.Namespace:
@@ -26,12 +17,23 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--limit", type=int, default=30, help="how many pairs to print (default: 30)")
 
     p.add_argument("--quality", action="store_true", help="apply quality filters + volume ranking")
-    p.add_argument("--min-qv", type=float, default=5_000_000.0, help="min 24h quote volume for quality mode")
+    p.add_argument(
+        "--min-qv",
+        type=float,
+        default=5_000_000.0,
+        help="min 24h quote volume in USDT for --quality (default: 5,000,000)",
+    )
 
     p.add_argument("--regime", action="store_true", help="compute TREND/RANGE/CHAOS for each pair (slower)")
-    p.add_argument("--timeframe", default="15m", help="ohlcv timeframe for regime (default: 15m)")
+    p.add_argument("--timeframe", default="1h", help="ohlcv timeframe for regime/setups (default: 1h)")
     p.add_argument("--bars", type=int, default=120, help="ohlcv bars to fetch (default: 120)")
-    p.add_argument("--max-pairs", type=int, default=60, help="max pairs to analyze for regime (default: 60)")
+    p.add_argument("--max-pairs", type=int, default=60, help="max pairs to analyze in regime mode (default: 60)")
+
+    p.add_argument(
+        "--setups",
+        action="store_true",
+        help="detect A+ setups (currently: trend pullback continuation longs) for TREND pairs",
+    )
 
     return p.parse_args()
 
@@ -55,30 +57,56 @@ def rank_quality_pairs(ex, markets: dict, pairs: list[str], min_qv: float) -> li
 
     scored.sort(key=lambda x: x[1], reverse=True)
 
-    # keep only those above threshold first; if none, keep top anyway
     above = [s for (s, qv) in scored if qv >= min_qv]
     if above:
         return above
     return [s for (s, _qv) in scored]
 
 
-def compute_regime_for_symbol(ex, symbol: str, timeframe: str, bars: int) -> tuple[MarketRegime, float, float]:
+def compute_regime_for_symbol(
+    ex,
+    symbol: str,
+    timeframe: str,
+    bars: int,
+) -> tuple[MarketRegime, float, float]:
     ohlcv = fetch_ohlcv_safe(ex, symbol, OHLCVConfig(timeframe=timeframe, limit=bars))
     highs, lows, closes = split_ohlcv(ohlcv)
+
     if not closes:
         return MarketRegime.RANGE, 0.0, 0.0
 
     a = atr_pct(highs, lows, closes)
     price = closes[-1]
+
     ema_fast = ema(closes, 20)
     ema_slow = ema(closes, 50)
-   ts = trend_strength(ema_fast, ema_slow, price)
-# direction bonus: treat trend_strength as 0 if EMAs are basically flat-crossing
-# (simple: if they are within 0.05% treat as not trending)
-if ts < 0.0005:
-    ts = 0.0
-r = classify_regime(a, ts)
+
+    ts = trend_strength(ema_fast, ema_slow, price)
+
+    # flat / no-direction guard (reduces false TREND in chop)
+    if ts < 0.0005:
+        ts = 0.0
+
+    r = classify_regime(a, ts)
     return r, a, ts
+
+
+def compute_setup_for_symbol(
+    ex,
+    symbol: str,
+    timeframe: str,
+    bars: int,
+) -> TradePlan | None:
+    """
+    Setup detection is read-only. It returns a TradePlan if conditions match.
+    Currently implemented:
+      - Trend pullback continuation LONG
+    """
+    ohlcv = fetch_ohlcv_safe(ex, symbol, OHLCVConfig(timeframe=timeframe, limit=bars))
+    highs, lows, closes = split_ohlcv(ohlcv)
+    if not closes:
+        return None
+    return detect_pullback_long(closes, lows, symbol, PullbackConfig())
 
 
 def main() -> int:
@@ -117,8 +145,31 @@ def main() -> int:
             print(f"{sym.ljust(16)} ERROR    {'-':>7} {'-':>7}  skip ({e})")
             continue
 
-        action = "trade-allowed" if r == MarketRegime.TREND else ("limited" if r == MarketRegime.RANGE else "NO TRADE")
+        plan: TradePlan | None = None
+        if args.setups and r == MarketRegime.TREND:
+            try:
+                plan = compute_setup_for_symbol(ex, sym, args.timeframe, args.bars)
+            except Exception:
+                plan = None
+
+        if plan is not None:
+            action = "A+ setup"
+        else:
+            action = (
+                "trade-allowed"
+                if r == MarketRegime.TREND
+                else ("limited" if r == MarketRegime.RANGE else "NO TRADE")
+            )
+
         print(f"{sym.ljust(16)} {r.value.ljust(8)} {a:7.2f} {ts:7.3f}  {action}")
+
+        if plan is not None:
+            # Show plan details (mentor-style, but still concise)
+            print(
+                f"  ↳ PLAN: {plan.direction.upper()} | SL={plan.stop:.6f} | TP1={plan.tp1:.6f} | TP2={plan.tp2:.6f}"
+            )
+            print(f"     TRIGGER: {plan.entry_trigger}")
+            print(f"     NOTES: {plan.notes}")
 
         shown += 1
         if shown >= max(args.limit, 0):
