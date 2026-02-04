@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>SENTINEL — Crypto Trading Scanner</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div class="wrap">
+    <header class="header">
+      <div>
+        <div class="title">SENTINEL</div>
+        <div class="sub">Local-first crypto market scanner • manual execution only</div>
+      </div>
+      <div class="status" id="status">Idle</div>
+    </header>
+
+    <section class="panel">
+      <div class="grid">
+        <div class="field">
+          <label>Trader Type (Preset)</label>
+          <select id="preset">
+            {{PRESET_OPTIONS}}
+          </select>
+        </div>
+
+        <div class="field">
+          <label>Exchange</label>
+          <input id="exchange" value="binance" />
+        </div>
+
+        <div class="field">
+          <label>Timeframe</label>
+          <input id="timeframe" />
+          <div class="hint">Auto-set by preset; you can override</div>
+        </div>
+
+        <div class="field">
+          <label>Bars</label>
+          <input id="bars" type="number" min="60" step="10" />
+        </div>
+
+        <div class="field">
+          <label>Max pairs analyzed</label>
+          <input id="max_pairs" type="number" min="10" step="5" />
+        </div>
+
+        <div class="field">
+          <label>Rows shown</label>
+          <input id="limit" type="number" min="5" step="5" value="20" />
+        </div>
+
+        <div class="field">
+          <label>Risk per trade (USDT)</label>
+          <input id="risk_usdt" type="number" min="0.2" step="0.1" value="1.0" />
+        </div>
+
+        <div class="field">
+          <label>Fee/slippage buffer (%)</label>
+          <input id="fee_buffer_pct" type="number" min="0" step="0.05" value="0.10" />
+        </div>
+
+        <div class="field check">
+          <label><input id="quality" type="checkbox" checked /> Quality filter (liquidity)</label>
+          <div class="hint">Filters out low-liquidity junk</div>
+        </div>
+
+        <div class="field">
+          <label>Min quote volume (USDT)</label>
+          <input id="min_qv" type="number" min="0" step="1000000" value="5000000" />
+        </div>
+
+        <div class="field check">
+          <label><input id="exclude_stables" type="checkbox" checked /> Exclude stablecoin base pairs</label>
+        </div>
+
+        <div class="field check">
+          <label><input id="setups" type="checkbox" checked /> Detect A+ setups</label>
+        </div>
+
+        <div class="field check">
+          <label><input id="brief" type="checkbox" checked /> Show Trader Briefing</label>
+        </div>
+
+        <div class="field">
+          <label>Auto refresh</label>
+          <div class="row">
+            <button id="run">Run now</button>
+            <button id="toggle">Start Auto</button>
+          </div>
+          <div class="hint">Scalping = every 5 minutes by default</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="row between">
+        <div class="sectionTitle">Results</div>
+        <div class="meta" id="meta">—</div>
+      </div>
+
+      <div class="tableWrap">
+        <table id="table">
+          <thead>
+            <tr>
+              <th>Symbol</th>
+              <th>Regime</th>
+              <th>ATR%</th>
+              <th>Trend</th>
+              <th>Action</th>
+              <th>Note</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel" id="briefingPanel" style="display:none;">
+      <div class="sectionTitle">Trader Briefing</div>
+      <pre id="briefing" class="pre"></pre>
+    </section>
+
+    <footer class="footer">
+      Built for clarity. No auto-trading. No exchange keys. Pure analysis + discipline.
+    </footer>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

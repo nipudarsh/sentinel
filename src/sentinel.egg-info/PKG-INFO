@@ -1,0 +1,12 @@
+Metadata-Version: 2.4
+Name: sentinel
+Version: 0.1.0
+Summary: Manual crypto trading coach agent (signals + risk rules + journaling). No auto-execution.
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+
+# SENTINEL
+Manual crypto trading coach agent (signals + risk rules + journaling). No auto-execution.
+
+## Status
+Work in progress.

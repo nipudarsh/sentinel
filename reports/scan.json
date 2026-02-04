@@ -1,0 +1,143 @@
+{
+  "exchange": "binance",
+  "timeframe": "4h",
+  "bars": 120,
+  "rows": [
+    {
+      "symbol": "BTC/USDT",
+      "regime": "trend",
+      "atr_pct": 1.5126419111804195,
+      "trend_strength": 0.04298939250568973,
+      "action": "trade-allowed",
+      "plan": null,
+      "sizing": null
+    },
+    {
+      "symbol": "ETH/USDT",
+      "regime": "trend",
+      "atr_pct": 2.603802548799572,
+      "trend_strength": 0.08895479554727316,
+      "action": "trade-allowed",
+      "plan": null,
+      "sizing": null
+    },
+    {
+      "symbol": "SOL/USDT",
+      "regime": "trend",
+      "atr_pct": 2.4930456891354353,
+      "trend_strength": 0.07013988010338733,
+      "action": "trade-allowed",
+      "plan": null,
+      "sizing": null
+    },
+    {
+      "symbol": "PAXG/USDT",
+      "regime": "trend",
+      "atr_pct": 1.4003583487477747,
+      "trend_strength": 0.020396685546107688,
+      "action": "trade-allowed",
+      "plan": null,
+      "sizing": null
+    },
+    {
+      "symbol": "XRP/USDT",
+      "regime": "trend",
+      "atr_pct": 2.3155489020187976,
+      "trend_strength": 0.056469154628829024,
+      "action": "trade-allowed",
+      "plan": null,
+      "sizing": null
+    },
+    {
+      "symbol": "SENT/USDT",
+      "regime": "chaos",
+      "atr_pct": 10.003247675881946,
+      "trend_strength": 0.07888991267407933,
+      "action": "NO TRADE",
+      "plan": null,
+      "sizing": null
+    },
+    {
+      "symbol": "BNB/USDT",
+      "regime": "trend",
+      "atr_pct": 1.609781936888486,
+      "trend_strength": 0.049597757251203516,
+      "action": "trade-allowed",
+      "plan": null,
+      "sizing": null
+    },
+    {
+      "symbol": "DOGE/USDT",
+      "regime": "trend",
+      "atr_pct": 2.555508315736283,
+      "trend_strength": 0.05248553664685702,
+      "action": "trade-allowed",
+      "plan": null,
+      "sizing": null
+    },
+    {
+      "symbol": "ZAMA/USDT",
+      "regime": "chaos",
+      "atr_pct": 12.546933667083854,
+      "trend_strength": 0.0,
+      "action": "NO TRADE",
+      "plan": null,
+      "sizing": null
+    },
+    {
+      "symbol": "ZEC/USDT",
+      "regime": "trend",
+      "atr_pct": 4.437377960162467,
+      "trend_strength": 0.0820788797669549,
+      "action": "trade-allowed",
+      "plan": null,
+      "sizing": null
+    },
+    {
+      "symbol": "TRX/USDT",
+      "regime": "trend",
+      "atr_pct": 0.9016723755792867,
+      "trend_strength": 0.01566810571776226,
+      "action": "trade-allowed",
+      "plan": null,
+      "sizing": null
+    },
+    {
+      "symbol": "SUI/USDT",
+      "regime": "trend",
+      "atr_pct": 3.3965607240271445,
+      "trend_strength": 0.09001677338702793,
+      "action": "trade-allowed",
+      "plan": null,
+      "sizing": null
+    },
+    {
+      "symbol": "LINK/USDT",
+      "regime": "trend",
+      "atr_pct": 2.6756026151467784,
+      "trend_strength": 0.07564152570261302,
+      "action": "trade-allowed",
+      "plan": null,
+      "sizing": null
+    },
+    {
+      "symbol": "ADA/USDT",
+      "regime": "trend",
+      "atr_pct": 2.818692052466743,
+      "trend_strength": 0.06331391411939812,
+      "action": "trade-allowed",
+      "plan": null,
+      "sizing": null
+    },
+    {
+      "symbol": "PEPE/USDT",
+      "regime": "trend",
+      "atr_pct": 3.738800484732901,
+      "trend_strength": 0.060278974818450966,
+      "action": "trade-allowed",
+      "plan": null,
+      "sizing": null
+    }
+  ],
+  "briefing": "==============================================================================\nSENTINEL \u2014 TRADER BRIEFING (manual execution only)\n==============================================================================\n\nTREND WATCHLIST (wait for A+ confirmation)\n------------------------------------------------------------------------------\n- BTC/USDT: Wait A+ (trend only)\n- ETH/USDT: Wait A+ (trend only)\n- SOL/USDT: Wait A+ (trend only)\n- PAXG/USDT: Wait A+ (trend only)\n- XRP/USDT: Wait A+ (trend only)\n- BNB/USDT: Wait A+ (trend only)\n- DOGE/USDT: Wait A+ (trend only)\n- ZEC/USDT: Wait A+ (trend only)\n- TRX/USDT: Wait A+ (trend only)\n- SUI/USDT: Wait A+ (trend only)\n- LINK/USDT: Wait A+ (trend only)\n- ADA/USDT: Wait A+ (trend only)\n- PEPE/USDT: Wait A+ (trend only)\n\nCHAOS (NO TRADE)\n------------------------------------------------------------------------------\n- SENT/USDT: protect capital\n- ZAMA/USDT: protect capital\n\nRISK RULES (v1)\n------------------------------------------------------------------------------\n- Risk per trade: keep small (default 1 USDT).\n- Daily rule: stop after -2R.\n- Only trade A+ setups. TREND alone is not an entry.\n==============================================================================\n"
+}
